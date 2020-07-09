@@ -103,6 +103,7 @@ final class ViewModel: NSObject, NSFetchedResultsControllerDelegate, ObservableO
     private func observeChangeNotification() {
         let cancellable = NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: container!.viewContext)
             .compactMap({ ManagedObjectContextChanges<Counter>(notification: $0) }).sink { (changes) in
+                self.container!.viewContext.saveIfNeeded()
         }
         cancellables.append(cancellable)
     }
