@@ -1,7 +1,7 @@
 
 This project demostrates three different ways of updating data in a background thread in a swiftUI project.
 
-Thanks to Tim Ritchey for some suggesting the addition of 
+Thanks to Tim Ritchey (@tritchey) for some suggesting the addition of 
 
     self.context.automaticallyMergesChangesFromParent = true
 
