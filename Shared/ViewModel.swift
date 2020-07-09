@@ -10,16 +10,12 @@ import Combine
 import CoreData
 import SwiftUI
 
-enum PersistanceOption {
-    case method1, method2, method3
-}
 final class ViewModel: NSObject, NSFetchedResultsControllerDelegate, ObservableObject {
     private var counterController: NSFetchedResultsController<Counter>
     
     var initialized = false
     var container:NSPersistentContainer? = nil
     var cancellables = [AnyCancellable]()
-    let persistanceOption:PersistanceOption = .method3
     public var context: NSManagedObjectContext
     
     // MARK: - Initializer
@@ -40,6 +36,9 @@ final class ViewModel: NSObject, NSFetchedResultsControllerDelegate, ObservableO
         counterController = Counter.resultsController(context: container!.viewContext, sortDescriptors: sortDescriptors)
         
         self.context = container!.viewContext
+        
+        // IMPORTANT: We need to set this to true so that our viewContext picks up changes saved to the container on background threads
+        self.context.automaticallyMergesChangesFromParent = true
         super.init()
 
         observeChangeNotification()
@@ -60,31 +59,14 @@ final class ViewModel: NSObject, NSFetchedResultsControllerDelegate, ObservableO
             print("nil container, can't create object")
             return
         }
-        
-        switch self.persistanceOption {
-            case .method1:
-                persistUsingMethod1()
-            case .method2:
-                persistUsingMethod2()
-            case .method3:
-                persistUsingMethod3()
-        }
-    }
-    
-    func addACounter(_ moc:NSManagedObjectContext) {
-        // This should be safe on any thread if we don't access the object attributes
-        let lastCount = self.counters.count
-        let counter = Counter(context: moc)
-        
-        counter.name = "Counter #\(lastCount + 1)"
-        counter.count = 0
-    }
-    
-    func persistUsingMethod1() {
-        
         container!.performBackgroundTask { (moc) in
             do {
-                self.addACounter(moc)
+                // This should be safe on any thread if we don't access the object attributes
+                let lastCount = self.counters.count
+                let counter = Counter(context: moc)
+                
+                counter.name = "Counter #\(lastCount + 1)"
+                counter.count = 0
                 try moc.save()
             }
             catch {
@@ -93,38 +75,6 @@ final class ViewModel: NSObject, NSFetchedResultsControllerDelegate, ObservableO
         }
     }
     
-    func persistUsingMethod2() {
-        container!.performBackgroundTask { (moc) in
-            do {
-                self.addACounter(moc)
-                try moc.save()
-                self.container!.viewContext.performAndWait {
-                     do {
-                        try self.container!.viewContext.save()
-                     } catch {
-                         print("Could not synchonize data. \(error), \(error.localizedDescription)")
-                     }
-                 }
-            }
-            catch {
-                print("Error creating new counter. \(error), \(error.localizedDescription)")
-            }
-        }
-    }
-
-    func persistUsingMethod3() {
-        let moc = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
-        moc.parent = container!.viewContext
-        moc.perform {
-            do {
-                self.addACounter(moc)
-                try moc.save()
-            }
-            catch {
-                print("Error creating new counter. \(error), \(error.localizedDescription)")
-            }
-        }
-    }
 
     public func incrementCounts() {
         if(container == nil) {
@@ -132,71 +82,15 @@ final class ViewModel: NSObject, NSFetchedResultsControllerDelegate, ObservableO
             return
         }
         
-        switch self.persistanceOption {
-            case .method1:
-                incrementUsingMethod1()
-            case .method2:
-                incrementUsingMethod2()
-            case .method3:
-                incrementUsingMethod3()
-        }
-
-    }
-
-    func incrementThemCounters() {
-        do {
-            let fetchRequest = NSFetchRequest<Counter>(entityName: "Counter")
-            var counterList: [Counter] = []
-            counterList = try self.context.fetch(fetchRequest)
-            print("found \(counterList.count) counters")
-            for counter in counterList {
-                counter.count += 1
-            }
-        }
-        catch {
-            print("Error fetching counter list. \(error), \(error.localizedDescription)")
-        }
-    }
-    
-    func incrementUsingMethod1() {
         container!.performBackgroundTask { (moc) in
             do {
-                self.incrementThemCounters()
-                try moc.save()
-            }
-            catch {
-                print("Error creating new counter. \(error), \(error.localizedDescription)")
-            }
-        }
-    }
-
-    
-    func incrementUsingMethod2() {
-        container!.performBackgroundTask { (moc) in
-            do {
-                self.incrementThemCounters()
-                try moc.save()
-                self.container!.viewContext.performAndWait {
-                     do {
-                        try self.container!.viewContext.save()
-                     } catch {
-                         print("Could not synchonize data. \(error), \(error.localizedDescription)")
-                     }
-                 }
-            }
-            catch {
-                print("Error creating new counter. \(error), \(error.localizedDescription)")
-            }
-        }
-    }
-
-    
-    func incrementUsingMethod3() {
-        let moc = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
-        moc.parent = container!.viewContext
-        moc.perform {
-            self.incrementThemCounters()
-            do {
+                let fetchRequest = NSFetchRequest<Counter>(entityName: "Counter")
+                var counterList: [Counter] = []
+                counterList = try self.context.fetch(fetchRequest)
+                print("found \(counterList.count) counters")
+                for counter in counterList {
+                    counter.count += 1
+                }
                 try moc.save()
             }
             catch {
